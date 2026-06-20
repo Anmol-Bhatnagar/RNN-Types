@@ -1,0 +1,10 @@
+torch
+datasets
+pandas
+numpy
+matplotlib
+seaborn
+scikit-learn
+seqeval
+notebook
+ipykernel
