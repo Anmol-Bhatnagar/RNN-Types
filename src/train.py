@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
+from src.utils import get_masked_correct_and_total
 
 def train_model(model, x_train, y_train, x_val, y_val, model_name, epochs=10, batch_size=64):
     """
@@ -75,10 +76,9 @@ def train_model(model, x_train, y_train, x_val, y_val, model_name, epochs=10, ba
             train_loss += loss.item() * batch_x.size(0)
             
             # Calculate training accuracy (excluding pad index -1)
-            preds = torch.argmax(logits, dim=-1)
-            mask = (batch_y != -1)
-            train_correct += ((preds == batch_y) & mask).sum().item()
-            train_total += mask.sum().item()
+            correct, total = get_masked_correct_and_total(logits, batch_y, ignore_index=-1)
+            train_correct += correct
+            train_total += total
             
         avg_train_loss = train_loss / len(train_loader.dataset)
         avg_train_acc = train_correct / (train_total + 1e-8)
@@ -99,10 +99,9 @@ def train_model(model, x_train, y_train, x_val, y_val, model_name, epochs=10, ba
                 
                 val_loss += loss.item() * batch_x.size(0)
                 
-                preds = torch.argmax(logits, dim=-1)
-                mask = (batch_y != -1)
-                val_correct += ((preds == batch_y) & mask).sum().item()
-                val_total += mask.sum().item()
+                correct, total = get_masked_correct_and_total(logits, batch_y, ignore_index=-1)
+                val_correct += correct
+                val_total += total
                 
         avg_val_loss = val_loss / len(val_loader.dataset)
         avg_val_acc = val_correct / (val_total + 1e-8)

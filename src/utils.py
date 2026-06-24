@@ -1,57 +1,39 @@
-import tensorflow as tf
-import time
+import torch
 
-def masked_sparse_categorical_crossentropy(y_true, y_pred):
+def get_masked_correct_and_total(logits, targets, ignore_index=-1):
     """
-    Computes sparse categorical crossentropy ignoring pad tokens (labeled as -1).
-    """
-    # Create mask for tokens that are NOT padding (-1)
-    mask = tf.not_equal(y_true, -1)
+    Returns the number of correct predictions and the total number of non-padding tokens.
     
-    # Replace padding index with 0 temporarily to prevent indexing errors in loss function
-    y_true_masked = tf.where(mask, y_true, tf.zeros_like(y_true))
-    
-    # Calculate standard crossentropy loss
-    loss = tf.keras.losses.sparse_categorical_crossentropy(y_true_masked, y_pred)
-    
-    # Cast mask to match loss type and zero out masked losses
-    mask = tf.cast(mask, dtype=loss.dtype)
-    loss *= mask
-    
-    # Return average loss over unmasked elements
-    return tf.reduce_sum(loss) / (tf.reduce_sum(mask) + 1e-8)
-
-def masked_accuracy(y_true, y_pred):
-    """
-    Computes token classification accuracy ignoring pad tokens (labeled as -1).
-    """
-    mask = tf.not_equal(y_true, -1)
-    
-    # Prevent out of bounds indices in target
-    y_true_masked = tf.where(mask, y_true, tf.zeros_like(y_true))
-    
-    # Calculate correctness
-    predictions = tf.cast(tf.argmax(y_pred, axis=-1), y_true.dtype)
-    correct = tf.equal(y_true_masked, predictions)
-    
-    # Zero out correctness for padded tokens
-    correct = tf.logical_and(correct, mask)
-    
-    # Return average accuracy over unmasked tokens
-    return tf.reduce_sum(tf.cast(correct, tf.float32)) / (tf.reduce_sum(tf.cast(mask, tf.float32)) + 1e-8)
-
-class EpochTimeCallback(tf.keras.callbacks.Callback):
-    """
-    Keras callback that records the duration of each training epoch.
-    """
-    def __init__(self):
-        super().__init__()
-        self.epoch_times = []
-        self.start_time = None
+    Args:
+        logits (torch.Tensor): Model predictions of shape (batch_size, seq_len, num_classes)
+                              or (batch_size * seq_len, num_classes).
+        targets (torch.Tensor): Ground truth labels of shape (batch_size, seq_len)
+                               or (batch_size * seq_len).
+        ignore_index (int): Index to ignore (e.g. -1 for padding).
         
-    def on_epoch_begin(self, epoch, logs=None):
-        self.start_time = time.time()
+    Returns:
+        correct (int): Number of correctly predicted non-padded tokens.
+        total (int): Total number of non-padded tokens.
+    """
+    preds = torch.argmax(logits, dim=-1)
+    mask = (targets != ignore_index)
+    correct = ((preds == targets) & mask).sum().item()
+    total = mask.sum().item()
+    return correct, total
+
+def masked_accuracy(logits, targets, ignore_index=-1):
+    """
+    Computes token-level classification accuracy ignoring padding tokens.
+    
+    Args:
+        logits (torch.Tensor): Model predictions.
+        targets (torch.Tensor): Ground truth labels.
+        ignore_index (int): Index to ignore.
         
-    def on_epoch_end(self, epoch, logs=None):
-        duration = time.time() - self.start_time
-        self.epoch_times.append(duration)
+    Returns:
+        float: Accuracy score between 0.0 and 1.0.
+    """
+    correct, total = get_masked_correct_and_total(logits, targets, ignore_index)
+    if total == 0:
+        return 0.0
+    return correct / total
