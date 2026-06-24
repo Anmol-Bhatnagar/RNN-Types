@@ -98,3 +98,53 @@ class BidirectionalGRUModel(nn.Module):
         logits = self.fc(out)
         return logits
 
+class SequenceSelfAttention(nn.Module):
+    """
+    Simple scaled dot-product self-attention mechanism over sequence outputs.
+    """
+    def __init__(self, hidden_dim):
+        super().__init__()
+        self.query = nn.Linear(hidden_dim, hidden_dim)
+        self.key = nn.Linear(hidden_dim, hidden_dim)
+        self.value = nn.Linear(hidden_dim, hidden_dim)
+        self.scale = 1.0 / (hidden_dim ** 0.5)
+        
+    def forward(self, x):
+        # x shape: (batch_size, seq_len, hidden_dim)
+        q = self.query(x)  # (batch_size, seq_len, hidden_dim)
+        k = self.key(x)    # (batch_size, seq_len, hidden_dim)
+        v = self.value(x)  # (batch_size, seq_len, hidden_dim)
+        
+        # Compute scaled attention energy
+        # (batch_size, seq_len, hidden_dim) x (batch_size, hidden_dim, seq_len) -> (batch_size, seq_len, seq_len)
+        attn_scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+        attn_weights = torch.softmax(attn_scores, dim=-1)
+        
+        # Compute weighted sum of values
+        # (batch_size, seq_len, seq_len) x (batch_size, seq_len, hidden_dim) -> (batch_size, seq_len, hidden_dim)
+        out = torch.matmul(attn_weights, v)
+        return out
+
+class AttentionLSTMModel(nn.Module):
+    """
+    LSTM model with sequence self-attention for Named Entity Recognition.
+    """
+    def __init__(self, vocab_size, num_classes, embedding_dim=128, hidden_dim=64):
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=0)
+        self.lstm = nn.LSTM(embedding_dim, hidden_dim, batch_first=True)
+        self.attention = SequenceSelfAttention(hidden_dim)
+        self.fc = nn.Linear(hidden_dim * 2, num_classes)
+        
+    def forward(self, x):
+        # x shape: (batch_size, seq_len)
+        embedded = self.embedding(x)
+        lstm_out, _ = self.lstm(embedded)
+        attn_out = self.attention(lstm_out)
+        
+        # Concatenate original LSTM states and self-attention context
+        combined = torch.cat([lstm_out, attn_out], dim=-1)
+        logits = self.fc(combined)
+        return logits
+
+

@@ -13,7 +13,8 @@ from src.models import (
     GRUModel,
     BidirectionalModel,
     DeepRNNModel,
-    BidirectionalGRUModel
+    BidirectionalGRUModel,
+    AttentionLSTMModel
 )
 from src.train import train_model
 from src.evaluate import evaluate_model
@@ -48,6 +49,7 @@ def main():
         "GRU": GRUModel(vocab_len, num_classes, embedding_dim, rnn_units),
         "Bidirectional": BidirectionalModel(vocab_len, num_classes, embedding_dim, rnn_units),
         "BidirectionalGRU": BidirectionalGRUModel(vocab_len, num_classes, embedding_dim, rnn_units),
+        "AttentionLSTM": AttentionLSTMModel(vocab_len, num_classes, embedding_dim, rnn_units),
         "DeepRNN": DeepRNNModel(vocab_len, num_classes, embedding_dim, rnn_units)
     }
     
