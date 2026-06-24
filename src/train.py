@@ -29,8 +29,9 @@ def train_model(model, x_train, y_train, x_val, y_val, model_name, epochs=10, ba
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     
-    # 3. Setup optimizer & loss function (ignoring index -1 corresponding to tag padding)
+    # 3. Setup optimizer, scheduler & loss function (ignoring index -1 corresponding to tag padding)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1)
     criterion = nn.CrossEntropyLoss(ignore_index=-1)
     
     # 4. History metrics tracking
@@ -39,6 +40,7 @@ def train_model(model, x_train, y_train, x_val, y_val, model_name, epochs=10, ba
         "accuracy": [],
         "val_loss": [],
         "val_accuracy": [],
+        "learning_rates": [],
         "epoch_times": [],
         "total_train_time": 0.0
     }
@@ -109,13 +111,21 @@ def train_model(model, x_train, y_train, x_val, y_val, model_name, epochs=10, ba
         duration = time.time() - epoch_start_time
         
         # Save metrics to history
+        current_lr = optimizer.param_groups[0]['lr']
         history["loss"].append(avg_train_loss)
         history["accuracy"].append(avg_train_acc)
         history["val_loss"].append(avg_val_loss)
         history["val_accuracy"].append(avg_val_acc)
+        history["learning_rates"].append(current_lr)
         history["epoch_times"].append(duration)
         
-        print(f"Epoch {epoch}/{epochs} - {duration:.2f}s - loss: {avg_train_loss:.4f} - accuracy: {avg_train_acc:.4f} - val_loss: {avg_val_loss:.4f} - val_accuracy: {avg_val_acc:.4f}")
+        print(f"Epoch {epoch}/{epochs} - {duration:.2f}s - loss: {avg_train_loss:.4f} - accuracy: {avg_train_acc:.4f} - val_loss: {avg_val_loss:.4f} - val_accuracy: {avg_val_acc:.4f} - lr: {current_lr:.6f}")
+        
+        # Step the learning rate scheduler
+        scheduler.step(avg_val_loss)
+        new_lr = optimizer.param_groups[0]['lr']
+        if new_lr < current_lr:
+            print(f"Learning rate reduced from {current_lr:.6f} to {new_lr:.6f}")
         
         # Early stopping and best model saving
         if avg_val_loss < best_val_loss:
