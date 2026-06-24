@@ -81,3 +81,20 @@ class DeepRNNModel(nn.Module):
         out, _ = self.lstm(embedded)
         logits = self.fc(out)
         return logits
+
+class BidirectionalGRUModel(nn.Module):
+    """
+    Bidirectional GRU model.
+    """
+    def __init__(self, vocab_size, num_classes, embedding_dim=128, hidden_dim=64):
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=0)
+        self.gru = nn.GRU(embedding_dim, hidden_dim, batch_first=True, bidirectional=True)
+        self.fc = nn.Linear(hidden_dim * 2, num_classes)
+        
+    def forward(self, x):
+        embedded = self.embedding(x)
+        out, _ = self.gru(embedded)
+        logits = self.fc(out)
+        return logits
+
